@@ -7,7 +7,7 @@ import torch
 import yaml
 import argparse
 
-config_file="/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/config/param/pm01_mujoco_minic.yaml"
+config_file="/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/config/param/test.yaml"
 
 anchor_body_name="LINK_TORSO_YAW"
 MOTION_BODY_INDEX = 3
@@ -138,8 +138,8 @@ if __name__ == "__main__":
 
                 base_ang_vel = d.qvel[3:6]
 
-                qj = (joint_pos[xml_to_policy] - motion_input_pos[timestep, :]) * dof_pos_scale
-                dqj = (joint_vel[xml_to_policy] - motion_input_vel[timestep, :]) * dof_vel_scale
+                qj = (joint_pos[xml_to_policy] - default_angles[xml_to_policy]) * dof_pos_scale
+                dqj = (joint_vel[xml_to_policy]) * dof_vel_scale
 
                 obs[:48] = motion_input
                 obs[48:54] = motion_anchor_ori_b
@@ -159,12 +159,12 @@ if __name__ == "__main__":
                 
                 if get_info:
                     print("--------------------------------")
-                    print("motion_command     \n", (obs[0:48]))
+                    # print("motion_command     \n", (obs[0:48]))
                     print("motion_anchor_ori_b\n", (obs[48:54]))
                     print("base_ang_vel       \n",(obs[54:57]))
                     print("joint_pos_rel      \n",(obs[57:81]))
-                    print("joint_vel_rel      \n",(obs[81:105]))
-                    print("last_action        \n",(obs[105:129]))
+                    # print("joint_vel_rel      \n",(obs[81:105]))
+                    # print("last_action        \n",(obs[105:129]))
                     
 
                 # Pick up changes to the physics state, apply perturbations, update options from GUI.

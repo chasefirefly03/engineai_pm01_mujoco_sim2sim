@@ -1,8 +1,9 @@
-policy_file: "src/pm01_deploy/config/policy/minic/dance.pt"
+policy_file: "/home/ubuntu/workspace/unitree_rl_lab/logs/rsl_rl/unitree_pm01_mimic/2026-03-10_12-32-55/exported/policy.pt"
 motion_file_path: "src/pm01_deploy/config/minic_motion_data/dance.npz"
+
 robot_xml_path: "/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/resource/pm_v2.xml"
 
-get_info: false
+get_info: true
 
 simulation_duration: 600
 simulation_dt: 0.001
@@ -21,11 +22,11 @@ observation_scale_joint_vel: 1.0
 action_scale: 1.0
 
 # joint control parameters
-default_joint_pos: [-0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
-                    -0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
+default_joint_pos: [-0.06, 0.0, 0.0, 0.12, -0.06, 0.0,
+                    -0.06, 0.0, 0.0, 0.12, -0.06, 0.0,
                     0.0,
-                    0.2,  0.13,  0.0, -0.65, 0.0,
-                    0.2, -0.13, 0.0, -0.65, 0.0,
+                    0.0,  0.15,  0.0, -0.25, 0.0,
+                    0.0, -0.15,  0.0, -0.25, 0.0,
                     0.0]
 
   # "J00_HIP_PITCH_L", "J01_HIP_ROLL_L", "J02_HIP_YAW_L", "J03_KNEE_PITCH_L", "J04_ANKLE_PITCH_L", "J05_ANKLE_ROLL_L",
@@ -35,17 +36,17 @@ default_joint_pos: [-0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
   # "J18_SHOULDER_PITCH_R", "J19_SHOULDER_ROLL_R", "J20_SHOULDER_YAW_R","J21_ELBOW_PITCH_R", "J22_ELBOW_YAW_R",
   # "J23_HEAD_YAW"
 
-joint_kp: [40.179, 99.098, 40.179, 99.098, 28.501, 28.501,
-           40.179, 99.098, 40.179, 99.098, 28.501, 28.501,
-           40.179,
-           14.251, 14.251, 14.251, 14.251, 14.251,
-           14.251, 14.251, 14.251, 14.251, 14.251,
-           14.251]
+joint_kp: [178.5, 178.5, 26.4, 178.5, 26.4, 26.4,
+           178.5, 178.5, 26.4, 178.5, 26.4, 26.4,
+           26.4,
+           26.4, 26.4, 26.4, 26.4, 26.4,
+           26.4, 26.4, 26.4, 26.4, 26.4,
+           26.4]
 
 
-joint_kd: [2.558, 6.309, 2.558, 6.309, 1.814, 1.814,
-           2.558, 6.309, 2.558, 6.309, 1.814, 1.814,
-           2.558,
-           0.907, 0.907, 0.907, 0.907, 0.907,
-           0.907, 0.907, 0.907, 0.907, 0.907,
-           0.907]
+joint_kd: [11.4, 11.4, 1.69, 11.4, 1.69, 1.69,
+           11.4, 11.4, 1.69, 11.4, 1.69, 1.69,
+           1.69,
+           1.69, 1.69, 1.69, 1.69, 1.69,
+           1.69, 1.69, 1.69, 1.69, 1.69,
+           1.69]
