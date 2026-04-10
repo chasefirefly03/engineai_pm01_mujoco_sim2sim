@@ -4,11 +4,19 @@
 > 2. 修改pm01_deploy/config/param下yaml文件的机器人模型路径`robot_xml_path`为绝对路径
 ## base walking
 ###  C++
-> C++仿真代码和实机部署的代码一样的
-1. 启动mujoco仿真模块`ros2 launch mujoco_simulator mujoco_simulator.launch.py`
+> C++仿真代码和实机部署的代码一样的,但是需要安装onnxruntime(见Sim2Real一节）
+1. 启动mujoco仿真模块
+```            
+ros2 launch mujoco_simulator mujoco_simulator.launch.py
+```
 
-2. 启动仿真`ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=src/pm01_deploy/config/pm01.yaml`
+2. 启动仿真
+```
+ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=src/pm01_deploy/config/pm01.yaml
+```
+
 ### Python
+> 需要安装pytorch
 - manager base env
 ```
 python3 pm01_deploy/script/deploy_mujoco_base.py --config_file pm01_deploy/config/param/pm01_mujoco_base_manager.yaml --policy_file pm01_deploy/config/policy/base_walking/manager_base_env.pt
@@ -17,14 +25,26 @@ python3 pm01_deploy/script/deploy_mujoco_base.py --config_file pm01_deploy/confi
 ```        
 python3 pm01_deploy/script/deploy_mujoco_base.py --config_file pm01_deploy/config/param/pm01_mujoco_base_direct.yaml --policy_file pm01_deploy/config/policy/base_walking/dirct_env.pt
 ```
+- 手柄控制机器人
+
+？？？？？？？？？？
+
+
 ## AMP
 `python3 src/pm01_deploy/script/deploy_mujoco_amp.py`
  
 ## Beyond Minic
-`python3 src/pm01_deploy/script/deploy_mujoco_minic.py`
+```
+python3 src/pm01_deploy/script/deploy_mujoco_minic.py`
+```
 
-# sim2real
-`ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=/src/pm01_deploy/config/pm01.yaml`
+# Sim2Real
+## 安装onnxruntime
+
+## 在机器人运行
+```
+ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=/src/pm01_deploy/config/pm01.yaml
+```
 
 # 现有的问题
 ## AMP
