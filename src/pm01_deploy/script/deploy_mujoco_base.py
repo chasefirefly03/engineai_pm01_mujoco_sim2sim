@@ -29,17 +29,22 @@ def pd_control(target_q, q, kp, target_dq, dq, kd):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument("config_file", type=str, help="config file name in the config folder")
-    # args = parser.parse_args()
-    # config_file = args.config_file
-    config_file="/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/config/param/pm01_mujoco.yaml"
+    parser.add_argument("config_file", nargs="?", type=str, help="config file path")
+    parser.add_argument("--config_file", dest="config_file_opt", type=str, help="config file path")
+    parser.add_argument("--policy_file", dest="policy_file_opt", type=str, help="policy file path")
+    args = parser.parse_args()
+    config_file = args.config_file_opt or args.config_file
+    if config_file is None:
+        parser.error("Please provide config_file as positional arg or --config_file")
+    # config_file="src/pm01_deploy/config/param/pm01_mujoco_base_direct.yaml"
 
     xml_to_policy = [0, 6, 12, 1, 7, 13, 18, 23, 2, 8, 14, 19, 3, 9, 15, 20, 4, 10, 16, 21, 5, 11, 17, 22]
     policy_to_xml = [0, 3, 8, 12, 16, 20, 1, 4, 9, 13, 17, 21, 2, 5, 10, 14, 18, 22, 6, 11, 15, 19, 23, 7]
 
     with open(config_file, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
-        policy_path = config["policy_file"]
+        # policy_path = config["policy_file"]
+        policy_path = args.policy_file_opt
         xml_path = config["robot_xml_path"]
         get_info = config["get_info"]
 

@@ -32,7 +32,8 @@ if __name__ == "__main__":
     # parser.add_argument("config_file", type=str, help="config file name in the config folder")
     # args = parser.parse_args()
     # config_file = args.config_file
-    config_file="src/pm01_deploy/config/param/pm01_mujoco_amp.yaml"
+    config_file="src/pm01_deploy/config/param/pm01_mujoco_base_direct.yaml"
+    # config_file="src/pm01_deploy/config/param/pm01_mujoco_base.yaml"
 
     xml_to_policy = [0, 6, 12, 1, 7, 13, 18, 23, 2, 8, 14, 19, 3, 9, 15, 20, 4, 10, 16, 21, 5, 11, 17, 22]
     policy_to_xml = [0, 3, 8, 12, 16, 20, 1, 4, 9, 13, 17, 21, 2, 5, 10, 14, 18, 22, 6, 11, 15, 19, 23, 7]
@@ -59,28 +60,16 @@ if __name__ == "__main__":
         base_quat_w_scale = config["observation_scale_base_quat_w"]
         # cmd_scale = np.array(config["cmd_scale"], dtype=np.float32)
 
-        num_actions = 24
-        num_obs = 425  # config["num_observations"]
+        num_actions = config["num_actions"]
+        num_obs = config["num_observations"]
         
         cmd = np.array(config["cmd_init"], dtype=np.float32)
+        period = np.array(config["cycle_time"], dtype=np.float32)
 
     # define context variables
     action = np.zeros(num_actions, dtype=np.float32)
     target_dof_pos = default_angles.copy()
     obs = np.zeros(num_obs, dtype=np.float32)
-    
-    # buffers
-    policy_history_len = 5
-    buffer_dof_pos = np.zeros((policy_history_len, 24), dtype=np.float32)
-    buffer_dof_vel = np.zeros((policy_history_len, 24), dtype=np.float32)
-    # buffer_action size should be consistent with action size which is 24 (num_actions from config)
-    buffer_action = np.zeros((policy_history_len, 24), dtype=np.float32) 
-    buffer_base_ang_vel = np.zeros((policy_history_len, 3), dtype=np.float32)
-    buffer_base_quat_w = np.zeros((policy_history_len, 4), dtype=np.float32)
-    buffer_cmd = np.zeros((policy_history_len, 3), dtype=np.float32)
-    buffer_proj_grav = np.zeros((policy_history_len, 3), dtype=np.float32)
-
-    counter = 0
 
     counter = 0
 
@@ -117,48 +106,22 @@ if __name__ == "__main__":
                 # gait_phase
 
                 count = counter * simulation_dt
+                phase = count % period / period
+                sin_phase = np.sin(2 * np.pi * phase)
+                cos_phase = np.cos(2 * np.pi * phase)
 
                 qj = (joint_pos - default_angles) * dof_pos_scale
                 dqj = joint_vel * dof_vel_scale
 
-                # update buffers
-                buffer_dof_pos = np.roll(buffer_dof_pos, -1, axis=0)
-                buffer_dof_pos[-1] = qj[xml_to_policy]
+                obs[:24] = qj[xml_to_policy]
+                obs[24:48] = dqj[xml_to_policy]               
+                obs[48:72] = action[xml_to_policy]
+                obs[72:75] = base_ang_vel * ang_vel_scale
+                obs[75:79] = base_quat_w * base_quat_w_scale
+                obs[79:82] = velocity_commands
+                obs[82:85] = projected_gravity
+                obs[85:87] = np.array([sin_phase, cos_phase])
 
-                buffer_dof_vel = np.roll(buffer_dof_vel, -1, axis=0)
-                buffer_dof_vel[-1] = dqj[xml_to_policy]
-
-                buffer_action = np.roll(buffer_action, -1, axis=0)
-                buffer_action[-1] = action[xml_to_policy]
-
-                buffer_base_ang_vel = np.roll(buffer_base_ang_vel, -1, axis=0)
-                buffer_base_ang_vel[-1] = base_ang_vel * ang_vel_scale
-
-                buffer_base_quat_w = np.roll(buffer_base_quat_w, -1, axis=0)
-                buffer_base_quat_w[-1] = base_quat_w * base_quat_w_scale
-
-                buffer_cmd = np.roll(buffer_cmd, -1, axis=0)
-                buffer_cmd[-1] = velocity_commands
-
-                buffer_proj_grav = np.roll(buffer_proj_grav, -1, axis=0)
-                buffer_proj_grav[-1] = projected_gravity
-
-                # construct obs
-                idx = 0
-                obs[idx:idx+120] = buffer_dof_pos.flatten()
-                idx += 120
-                obs[idx:idx+120] = buffer_dof_vel.flatten()
-                idx += 120
-                obs[idx:idx+120] = buffer_action.flatten()
-                idx += 120
-                obs[idx:idx+15] = buffer_base_ang_vel.flatten()
-                idx += 15
-                obs[idx:idx+20] = buffer_base_quat_w.flatten()
-                idx += 20
-                obs[idx:idx+15] = buffer_cmd.flatten()
-                idx += 15
-                obs[idx:idx+15] = buffer_proj_grav.flatten()
-                
                 obs_tensor = torch.from_numpy(obs).unsqueeze(0)
                 # policy inference
                 action = policy(obs_tensor).detach().numpy().squeeze()
@@ -168,13 +131,14 @@ if __name__ == "__main__":
 
                 if get_info:
                     print("--------------------------------")
-                    print("joint_pos         \n", obs[0:120])
-                    print("joint_vel         \n", obs[120:240])
-                    print("actions           \n", obs[240:360])
-                    print("base_ang_vel      \n", obs[360:375])
-                    print("base_quat_w       \n", obs[375:395])
-                    print("velocity_commands \n", obs[395:410])
-                    print("projected_gravity \n", obs[410:425])
+                    print("joint_pos        \n", (obs[0:24]))
+                    print("joint_vel        \n", (obs[24:48]))
+                    print("actions          \n",(obs[48:72]))
+                    print("base_ang_vel     \n",(obs[72:75]))
+                    print("base_quat_w      \n",(obs[75:79]))
+                    print("velocity_commands\n",(obs[79:82]))
+                    print("projected_gravity\n",(obs[82:85]))
+                    print("gait_phase       \n",(obs[85:87]))
                     
 
                 # Pick up changes to the physics state, apply perturbations, update options from GUI.
