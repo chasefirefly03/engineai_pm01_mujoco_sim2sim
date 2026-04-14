@@ -51,8 +51,9 @@ python3 src/pm01_deploy/script/deploy_mujoco_base.py --config_file src/pm01_depl
 `python3 src/pm01_deploy/script/deploy_mujoco_amp.py`
  
 ## Beyond Minic
+动作文件和策略可在`src/pm01_deploy/config/param/pm01_mujoco_minic.yaml`中修改
 ```
-python3 src/pm01_deploy/script/deploy_mujoco_minic.py
+python3 src/pm01_deploy/script/deploy_mujoco_minic.py --config_file src/pm01_deploy/config/param/pm01_mujoco_minic.yaml
 ```
 
 # Sim2Real

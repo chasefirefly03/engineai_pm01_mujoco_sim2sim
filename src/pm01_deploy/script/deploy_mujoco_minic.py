@@ -7,7 +7,7 @@ import torch
 import yaml
 import argparse
 
-config_file="src/pm01_deploy/config/param/pm01_mujoco_minic.yaml"
+# config_file="src/pm01_deploy/config/param/pm01_mujoco_minic.yaml"
 
 anchor_body_name="LINK_TORSO_YAW"
 MOTION_BODY_INDEX = 3
@@ -49,9 +49,9 @@ def pd_control(target_q, q, kp, target_dq, dq, kd):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument("config_file", type=str, help="config file name in the config folder")
-    # args = parser.parse_args()
-    # config_file = args.config_file
+    parser.add_argument("--config_file", type=str, help="config file name in the config folder")
+    args = parser.parse_args()
+    config_file = args.config_file
 
     xml_to_policy = [0, 6, 12, 1, 7, 13, 18, 23, 2, 8, 14, 19, 3, 9, 15, 20, 4, 10, 16, 21, 5, 11, 17, 22]
     policy_to_xml = [0, 3, 8, 12, 16, 20, 1, 4, 9, 13, 17, 21, 2, 5, 10, 14, 18, 22, 6, 11, 15, 19, 23, 7]

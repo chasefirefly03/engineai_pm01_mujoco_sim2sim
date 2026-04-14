@@ -1,5 +1,5 @@
-policy_file: "src/pm01_deploy/config/minic_motion_data/dance.npz"
-motion_file_path: "src/pm01_deploy/config/policy/minic/dance.pt"
+policy_file: "src/pm01_deploy/config/policy/minic/dan1_sub1.pt"
+motion_file_path: "src/pm01_deploy/config/minic_motion_data/dance1_subject1.npz"
 
 robot_xml_path: "/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/resource/pm_v2.xml"
 
