@@ -10,6 +10,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Core>
 
+
 #include "components/message_handler.hpp"
 #include "pm01_controller.hpp"
 
@@ -17,11 +18,12 @@
 pm01_controller::pm01_controller():Node("pm01_controller"), session(nullptr){
     this->declare_parameter<std::string>("config_file", "");
     this->get_parameter("config_file", config_file);
-    this->declare_parameter<std::string>("policy_file", "");
-    this->get_parameter("policy_file", policy_file);    
 
     if (config_file.empty()) {
         RCLCPP_ERROR(this->get_logger(), "Config file parameter 'config_file' is not set!");
+        // Determine a default logic or just let it fail if critical. 
+        // Given the code does LoadFile immediately, we should probably return or throw. 
+        // But since constructor can't return, throwing is appropriate or error logging.
     } else {
         RCLCPP_INFO(this->get_logger(), "Loading config from: %s", config_file.c_str());
     }
@@ -54,7 +56,7 @@ pm01_controller::pm01_controller():Node("pm01_controller"), session(nullptr){
     global_phase_ = 0.0f;
     time = 0.0f;
 
-    // policy_file = yaml_node["policy_file"].as<std::string>();
+    policy_file = yaml_node["policy_file"].as<std::string>();
 
     info_get_action_output = yaml_node["info_get_action_output"].as<bool>();
     info_get_joint_command_output = yaml_node["info_get_joint_command_output"].as<bool>();
@@ -168,10 +170,13 @@ void pm01_controller::RLControl() {
 
     Eigen::Vector3f base_ang_vel = Eigen::Vector3f(imu->angular_velocity.x, imu->angular_velocity.y, imu->angular_velocity.z).cast<float>();
 
-    auto cmd_vel_ = message_handler_->GetLatestCmdVel();
     auto velocity_commands_ = message_handler_->GetLatestBodyVelCmd();
     Eigen::Vector3f velocity_commands;
-    velocity_commands = Eigen::Vector3f(cmd_vel_->linear.x, cmd_vel_->linear.y, cmd_vel_->angular.z).cast<float>();
+    if (velocity_commands_) {
+        velocity_commands = Eigen::Vector3f(velocity_commands_->linear_velocity[0],velocity_commands_->linear_velocity[1],velocity_commands_->yaw_velocity).cast<float>();
+    } else {
+        velocity_commands = set_body_vel;
+    }
 
     // Pass quaternion to projected_gravity_b
     Eigen::Vector3f projected_gravity = projected_gravity_b(base_quat, gravity_world);
@@ -235,10 +240,10 @@ void pm01_controller::RLControl() {
     // Assume output is (1, num_actions)
     std::memcpy(act.data(), floatarr, static_cast<size_t>(num_actions) * sizeof(float));
     
-    // for(int i=0; i<act.size(); ++i) {
-    //     if(act(i) > action_clip_limit) act(i) = action_clip_limit;
-    //     if(act(i) < -action_clip_limit) act(i) = -action_clip_limit;
-    // }
+    for(int i=0; i<act.size(); ++i) {
+        if(act(i) > action_clip_limit) act(i) = action_clip_limit;
+        if(act(i) < -action_clip_limit) act(i) = -action_clip_limit;
+    }
 
     joint_command_->position.resize(24);
     for (int i = 0; i < 24; i++){

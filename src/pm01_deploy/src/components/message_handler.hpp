@@ -11,6 +11,7 @@
 #include "interface_protocol/msg/motion_state.hpp"
 #include "interface_protocol/msg/parallel_parser_type.hpp"
 #include "interface_protocol/msg/body_vel_cmd.hpp"
+#include <geometry_msgs/msg/twist.hpp>
 
 class MessageHandler {
  public:
@@ -28,6 +29,7 @@ class MessageHandler {
   interface_protocol::msg::ImuInfo::SharedPtr GetLatestImu() const { return latest_imu_; }
   interface_protocol::msg::MotionState::SharedPtr GetLatestMotionState() const { return latest_motion_state_; }
   interface_protocol::msg::BodyVelCmd::SharedPtr GetLatestBodyVelCmd() const { return latest_bodyvel_command_; }
+  geometry_msgs::msg::Twist::SharedPtr GetLatestCmdVel() const { return latest_cmd_vel_; }
 
  private:
   void GamepadCallback(const interface_protocol::msg::GamepadKeys::SharedPtr msg);
@@ -35,6 +37,7 @@ class MessageHandler {
   void JointStateCallback(const interface_protocol::msg::JointState::SharedPtr msg);
   void MotionStateCallback(const interface_protocol::msg::MotionState::SharedPtr msg);
   void BodyVelCmdCallback(const interface_protocol::msg::BodyVelCmd::SharedPtr msg);
+  void CmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
   rclcpp::Node::SharedPtr node_;
 
   // Subscribers
@@ -43,6 +46,7 @@ class MessageHandler {
   rclcpp::Subscription<interface_protocol::msg::JointState>::SharedPtr joint_state_sub_;
   rclcpp::Subscription<interface_protocol::msg::MotionState>::SharedPtr motion_state_sub_;
   rclcpp::Subscription<interface_protocol::msg::BodyVelCmd>::SharedPtr bodyvel_command_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
 
   // Publisher
   rclcpp::Publisher<interface_protocol::msg::JointCommand>::SharedPtr joint_cmd_pub_;
@@ -53,6 +57,7 @@ class MessageHandler {
   interface_protocol::msg::JointState::SharedPtr latest_joint_state_;
   interface_protocol::msg::MotionState::SharedPtr latest_motion_state_;
   interface_protocol::msg::BodyVelCmd::SharedPtr latest_bodyvel_command_;
+  geometry_msgs::msg::Twist::SharedPtr latest_cmd_vel_;
 };
 
 

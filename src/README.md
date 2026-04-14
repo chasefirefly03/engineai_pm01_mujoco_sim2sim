@@ -1,3 +1,11 @@
+- manager base env的C++部署还存在问题
+- direct env 不能原地旋转
+
+# 编译
+```
+colcon build
+source install/setup.bash
+```
 
 # Sim2Sim
 > 1. 运行之前需要编译
@@ -11,19 +19,28 @@ ros2 launch mujoco_simulator mujoco_simulator.launch.py
 ```
 
 2. 启动仿真
+- manager base env????????
 ```
-ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=src/pm01_deploy/config/pm01.yaml
+ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=src/pm01_deploy/config/param/pm01_real_base_manager.yaml -p policy_file:=src/pm01_deploy/config/policy/base_walking/manager_base_env.onnx
+```
+- direct env 
+```
+ros2 run pm01_deploy pm01_controller --ros-args -p config_file:=src/pm01_deploy/config/param/pm01_real_direct_env.yaml -p policy_file:=src/pm01_deploy/config/policy/base_walking/dirct_env.onnx
+```
+3. 启动手柄??????
+```
+python src/pm01_deploy/script/gamepad_publisher.py
 ```
 
 ### Python
 > 需要安装pytorch
 - manager base env
 ```
-python3 pm01_deploy/script/deploy_mujoco_base.py --config_file pm01_deploy/config/param/pm01_mujoco_base_manager.yaml --policy_file pm01_deploy/config/policy/base_walking/manager_base_env.pt
+python3 src/pm01_deploy/script/deploy_mujoco_base.py --config_file src/pm01_deploy/config/param/pm01_mujoco_base_manager.yaml --policy_file src/pm01_deploy/config/policy/base_walking/manager_base_env.pt
 ```
 - direct env
 ```        
-python3 pm01_deploy/script/deploy_mujoco_base.py --config_file pm01_deploy/config/param/pm01_mujoco_base_direct.yaml --policy_file pm01_deploy/config/policy/base_walking/dirct_env.pt
+python3 src/pm01_deploy/script/deploy_mujoco_base.py --config_file src/pm01_deploy/config/param/pm01_mujoco_base_direct.yaml --policy_file src/pm01_deploy/config/policy/base_walking/dirct_env.pt
 ```
 - 手柄控制机器人
 
@@ -35,7 +52,7 @@ python3 pm01_deploy/script/deploy_mujoco_base.py --config_file pm01_deploy/confi
  
 ## Beyond Minic
 ```
-python3 src/pm01_deploy/script/deploy_mujoco_minic.py`
+python3 src/pm01_deploy/script/deploy_mujoco_minic.py
 ```
 
 # Sim2Real

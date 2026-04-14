@@ -27,6 +27,9 @@ void MessageHandler::Initialize() {
 
   bodyvel_command_ = node_->create_subscription<interface_protocol::msg::BodyVelCmd>(
       "/hardware/body_vel_cmd", 1, std::bind(&MessageHandler::BodyVelCmdCallback, this, std::placeholders::_1));      
+
+  cmd_vel_sub_ = node_->create_subscription<geometry_msgs::msg::Twist>(
+      "/pm01_cmd_vel", 10, std::bind(&MessageHandler::CmdVelCallback, this, std::placeholders::_1));
 }
 
 
@@ -49,6 +52,10 @@ void MessageHandler::JointStateCallback(const interface_protocol::msg::JointStat
 
 void MessageHandler::BodyVelCmdCallback(const interface_protocol::msg::BodyVelCmd::SharedPtr msg) {
   latest_bodyvel_command_ = msg;
+}
+
+void MessageHandler::CmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
+  latest_cmd_vel_ = msg;
 }
 
 void MessageHandler::PublishJointCommand(const interface_protocol::msg::JointCommand::SharedPtr command) {

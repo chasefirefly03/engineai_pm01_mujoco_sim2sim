@@ -30,13 +30,6 @@ action_scale: 0.5
 # "J18_SHOULDER_PITCH_R", "J19_SHOULDER_ROLL_R", "J20_SHOULDER_YAW_R","J21_ELBOW_PITCH_R", "J22_ELBOW_YAW_R",
 # "J23_HEAD_YAW"
 
-# joint control parameters
-# default_joint_pos: [-0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
-#                     -0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
-#                     0.0,
-#                     0.0,  0.1,  0.0, 0.0, 0.0,
-#                     0.0, -0.1, 0.0, 0.0, 0.0,
-#                     0.0]
 default_joint_pos: [-0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
                     -0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
                     0.0,

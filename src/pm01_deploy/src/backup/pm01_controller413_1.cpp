@@ -168,10 +168,13 @@ void pm01_controller::RLControl() {
 
     Eigen::Vector3f base_ang_vel = Eigen::Vector3f(imu->angular_velocity.x, imu->angular_velocity.y, imu->angular_velocity.z).cast<float>();
 
-    auto cmd_vel_ = message_handler_->GetLatestCmdVel();
     auto velocity_commands_ = message_handler_->GetLatestBodyVelCmd();
     Eigen::Vector3f velocity_commands;
-    velocity_commands = Eigen::Vector3f(cmd_vel_->linear.x, cmd_vel_->linear.y, cmd_vel_->angular.z).cast<float>();
+    if (velocity_commands_) {
+        velocity_commands = Eigen::Vector3f(velocity_commands_->linear_velocity[0],velocity_commands_->linear_velocity[1],velocity_commands_->yaw_velocity).cast<float>();
+    } else {
+        velocity_commands = set_body_vel;
+    }
 
     // Pass quaternion to projected_gravity_b
     Eigen::Vector3f projected_gravity = projected_gravity_b(base_quat, gravity_world);
@@ -378,19 +381,17 @@ void pm01_controller::DampState() {
     message_handler_->PublishJointCommand(*joint_command_);
 }
 
-Eigen::Vector3f pm01_controller::projected_gravity_b(Eigen::Quaternionf quat, Eigen::Vector3f vec) {
-    float w = quat.w();
-    float x = quat.x();
-    float y = quat.y();
-    float z = quat.z();
+Eigen::Vector3f pm01_controller::projected_gravity_b(Eigen::Quaternionf quat, Eigen::Vector3f /*vec*/) {
+    float qw = quat.w();
+    float qx = quat.x();
+    float qy = quat.y();
+    float qz = quat.z();
     
-    // reshape to (N, 3) for multiplication -> vec is already (3)
-    // extract components from quaternions
-    Eigen::Vector3f xyz(x, y, z);
-    // t = xyz.cross(vec, dim=-1) * 2
-    Eigen::Vector3f t = xyz.cross(vec) * 2;
-    // (vec - quat[:, 0:1] * t + xyz.cross(t, dim=-1))
-    return vec - w * t + xyz.cross(t);
+    Eigen::Vector3f res;
+    res[0] = 2 * (-qz * qx + qw * qy);
+    res[1] = -2 * (qz * qy + qw * qx);
+    res[2] = 1 - 2 * (qw * qw + qz * qz);
+    return res;
 }
 
 int main(int argc, char **argv)
