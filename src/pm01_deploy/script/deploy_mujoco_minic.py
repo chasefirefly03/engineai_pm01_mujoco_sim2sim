@@ -7,7 +7,7 @@ import torch
 import yaml
 import argparse
 
-# config_file="src/pm01_deploy/config/param/pm01_mujoco_minic.yaml"
+config_file="src/pm01_deploy/config/param/pm01_mujoco_minic.yaml"
 
 anchor_body_name="LINK_TORSO_YAW"
 MOTION_BODY_INDEX = 3
@@ -41,7 +41,31 @@ def quaternion_multiply(q1, q2):  # 计算四元数乘积
     y = w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2  # 计算结果 y 分量  
     z = w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2  # 计算结果 z 分量  
     
-    return np.array([w, x, y, z])  # 返回乘积四元数 
+    return np.array([w, x, y, z])  # 返回乘积四元数
+
+
+def get_yaw_matrix_from_quat(quat_wxyz):  # 与 pm01_controller.cpp / GetYawMatrixFromQuat 一致
+    rotm = np.zeros(9, dtype=np.float64)
+    mujoco.mju_quat2Mat(rotm, quat_wxyz.astype(np.float64))
+    R = rotm.reshape(3, 3)
+    x_axis_rotated = R[:, 0]
+    x_proj = np.array([x_axis_rotated[0], x_axis_rotated[1]], dtype=np.float64)
+    n = np.linalg.norm(x_proj)
+    if n < 1e-4:
+        return np.eye(3, dtype=np.float64)
+    x_proj = x_proj / n
+    new_x = np.array([x_proj[0], x_proj[1], 0.0], dtype=np.float64)
+    new_z = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    new_y = np.cross(new_z, new_x)
+    return np.stack([new_x, new_y, new_z], axis=1)
+
+
+def rotation_matrix_to_quat_wxyz(R):  # MuJoCo w,x,y,z
+    quat = np.zeros(4, dtype=np.float64)
+    mat9 = np.ascontiguousarray(R.reshape(9), dtype=np.float64)
+    mujoco.mju_mat2Quat(quat, mat9)
+    return quat.astype(np.float64)
+
 
 def pd_control(target_q, q, kp, target_dq, dq, kd):
     """Calculates torques from position commands"""
@@ -49,9 +73,9 @@ def pd_control(target_q, q, kp, target_dq, dq, kd):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_file", type=str, help="config file name in the config folder")
-    args = parser.parse_args()
-    config_file = args.config_file
+    # parser.add_argument("--config_file", type=str, help="config file name in the config folder")
+    # args = parser.parse_args()
+    # config_file = args.config_file
 
     xml_to_policy = [0, 6, 12, 1, 7, 13, 18, 23, 2, 8, 14, 19, 3, 9, 15, 20, 4, 10, 16, 21, 5, 11, 17, 22]
     policy_to_xml = [0, 3, 8, 12, 16, 20, 1, 4, 9, 13, 17, 21, 2, 5, 10, 14, 18, 22, 6, 11, 15, 19, 23, 7]
@@ -101,10 +125,12 @@ if __name__ == "__main__":
     motion_body_index = MOTION_BODY_INDEX
     body_name = anchor_body_name
     body_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, body_name)  # 获取锚点 ID 
-    motion_pos, motion_quat, motion_input_pos, motion_input_vel = load_motion(motion_file)
+    _, motion_quat, motion_input_pos, motion_input_vel = load_motion(motion_file)
+    init_to_world_quat = None  # 首帧 yaw 对齐：将参考动作首帧水平朝向与仿真锚点对齐
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
         # Close the viewer automatically after simulation_duration wall-seconds.
+        # time.sleep(5)
         start = time.time()
         while viewer.is_running() and time.time() - start < simulation_duration:
             step_start = time.time()
@@ -116,17 +142,21 @@ if __name__ == "__main__":
 
             counter += 1
             if counter % control_decimation == 0:
-                position = d.xpos[body_id]  # 获取仿真中锚点刚体位置  
                 quaternion = d.xquat[body_id]  # 获取仿真中锚点刚体姿态  
                 motion_input = np.concatenate(  # 拼接目标关节位置与速度  
                     (motion_input_pos[timestep, :], motion_input_vel[timestep, :]),  # 使用 npz 原始关节顺序  
                     axis=0,  # 进行拼接  
                 )  # 拼接结束  
-                motion_pos_current = motion_pos[timestep, motion_body_index, :]  # 读取当前参考锚点动作位置  
                 motion_quat_current = motion_quat[timestep, motion_body_index, :]  # 读取当前参考锚点动作姿态  
-                _, anchor_quat = subtract_frame_transforms_mujoco(  # 计算相对锚点位置与姿态  
-                    position, quaternion, motion_pos_current, motion_quat_current  # 输入位姿参数  
-                )  # 获取相对位置与旋转结果  
+                # yaw 对齐：init_to_world = R_yaw_robot @ R_yaw_motion.T，首帧冻结（同 pm01_controller / rl_beyondmimic.cc）
+                if timestep == 0:
+                    yaw_motion = get_yaw_matrix_from_quat(motion_quat[0, motion_body_index])
+                    yaw_robot = get_yaw_matrix_from_quat(quaternion)
+                    init_to_world_mat = yaw_robot @ yaw_motion.T
+                    init_to_world_quat = rotation_matrix_to_quat_wxyz(init_to_world_mat)
+                motion_frame_alignment = quaternion_multiply(init_to_world_quat, motion_quat_current)
+                anchor_quat = quaternion_multiply(quaternion_conjugate(quaternion), motion_frame_alignment)
+                anchor_quat = anchor_quat / np.linalg.norm(anchor_quat)
                 anchor_ori = np.zeros(9)  # 初始化锚点旋转矩阵  
                 mujoco.mju_quat2Mat(anchor_ori, anchor_quat)  # 仿真锚点相对于参考锚点的相对姿态四元数转旋转矩阵  
                 anchor_ori = anchor_ori.reshape(3, 3)[:, :2]  # 取旋转矩阵前两列  

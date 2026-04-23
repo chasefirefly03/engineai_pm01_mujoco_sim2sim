@@ -2,10 +2,13 @@
 #include <memory>
 #include <rclcpp/logging.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/parameter.hpp>
 #include <thread>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <stdexcept>
+#include <string>
 #include <yaml-cpp/yaml.h>
 #include <Eigen/Dense>
 #include <Eigen/Core>
@@ -13,20 +16,18 @@
 #include "components/message_handler.hpp"
 #include "pm01_controller.hpp"
 
-
 pm01_controller::pm01_controller():Node("pm01_controller"), session(nullptr){
     this->declare_parameter<std::string>("config_file", "");
     this->get_parameter("config_file", config_file);
-    this->declare_parameter<std::string>("policy_file", "");
-    this->get_parameter("policy_file", policy_file);    
-
-    if (config_file.empty()) {
-        RCLCPP_ERROR(this->get_logger(), "Config file parameter 'config_file' is not set!");
-    } else {
-        RCLCPP_INFO(this->get_logger(), "Loading config from: %s", config_file.c_str());
-    }
+    // this->declare_parameter<std::string>("policy_file", "");
+    // this->get_parameter("policy_file", policy_file);    
+    // this->declare_parameter<std::string>("motion_file_npz", "");
+    // this->get_parameter("motion_file_npz", motion_file_npz);
 
     YAML::Node yaml_node = YAML::LoadFile(config_file);
+
+    policy_file = yaml_node["policy_file"].as<std::string>();
+    motion_file_csv = yaml_node["motion_file_path"].as<std::string>();
 
 	default_joint_pos = yaml_node["default_joint_pos"].as<std::vector<float>>();
     joint_kp = yaml_node["joint_kp"].as<std::vector<float>>();
@@ -39,26 +40,17 @@ pm01_controller::pm01_controller():Node("pm01_controller"), session(nullptr){
     num_observations = yaml_node["num_observations"].as<float>();
     num_actions = yaml_node["num_actions"].as<float>();
     action_scale = yaml_node["action_scale"].as<float>();
-    action_clip_limit = yaml_node["action_clip_limit"].as<float>();
-
-    control_frequency = yaml_node["control_frequency"].as<float>();
-    cycle_time = yaml_node["cycle_time"].as<float>();
-
-    std::vector<float> set_body_vel_vec = yaml_node["set_body_vel"].as<std::vector<float>>();
-    set_body_vel = Eigen::Vector3f(set_body_vel_vec[0], set_body_vel_vec[1], set_body_vel_vec[2]);
-
-    std::vector<float> gravity_world_vec = yaml_node["gravity_world"].as<std::vector<float>>();
-    gravity_world = Eigen::Vector3f(gravity_world_vec[0], gravity_world_vec[1], gravity_world_vec[2]);
-    gravity_world.normalize();
-
-    global_phase_ = 0.0f;
-    time = 0.0f;
-
-    // policy_file = yaml_node["policy_file"].as<std::string>();
 
     info_get_action_output = yaml_node["info_get_action_output"].as<bool>();
     info_get_joint_command_output = yaml_node["info_get_joint_command_output"].as<bool>();
     info_get_obs = yaml_node["info_get_obs"].as<bool>();
+    fps = yaml_node["motion_data_fps"].as<float>();
+    control_frequency = yaml_node["control_frequency"].as<float>();
+    if (fps <= 0.f || control_frequency <= 0.f) {
+        throw std::runtime_error(
+            "motion_data_fps and control_frequency must be positive (got motion_data_fps=" +
+            std::to_string(fps) + ", control_frequency=" + std::to_string(control_frequency) + ")");
+    }
 
     obs.setZero(num_observations);
 	act.setZero(num_actions);
@@ -71,6 +63,11 @@ pm01_controller::pm01_controller():Node("pm01_controller"), session(nullptr){
     Ort::SessionOptions session_options;
     session_options.SetIntraOpNumThreads(1);
     
+    time = 0.0f;
+    timestep = 0;
+    torso_yaw_degree = 0.0f;
+    init_quat.setIdentity();
+
     // Check if policy file exists
     std::ifstream f(policy_file.c_str());
     if (!f.good()) {
@@ -111,7 +108,14 @@ pm01_controller::pm01_controller():Node("pm01_controller"), session(nullptr){
         RCLCPP_INFO(this->get_logger(), "Model Output %zu: %s", i, output_node_names[i]);
     }
 
-    current_state_ = ControlState::ZERO_TORQUE;
+    // loading motion data
+    motion = std::make_shared<MotionLoader_>(motion_file_csv, fps);
+
+    // ?????????????????????????????????????
+    // switch to zero torque state
+    // current_state_ = ControlState::ZERO_TORQUE;
+    current_state_ = ControlState::RL_CONTROL;
+    
 }
 
 bool pm01_controller::Initialize() {
@@ -140,7 +144,20 @@ bool pm01_controller::Initialize() {
         
         RCLCPP_INFO(get_logger(), "Starting control loop");
         control_timer_ = create_wall_timer(std::chrono::duration<float>(1.0/control_frequency),
-                                         std::bind(&pm01_controller::ControlCallback, this));        
+                                         std::bind(&pm01_controller::ControlCallback, this));   
+
+        // 获取机器人初始朝向和参考动作之间的yaw旋转差
+        auto imu = message_handler_->GetLatestImu();
+        Eigen::Quaternionf robot_init_base_link_quaternion(
+            (float)imu->quaternion.w, 
+            (float)imu->quaternion.x, 
+            (float)imu->quaternion.y, 
+            (float)imu->quaternion.z);
+        auto joint_init_position = message_handler_->GetLatestJointState();
+        Eigen::Quaternionf motion_first_quaternion = motion->root_quaternions[0];
+        Eigen::Quaternionf robot_init_torso_quaternion = pm01_utils::get_torso_quat_w(robot_init_base_link_quaternion,torso_yaw_degree);
+        init_quat = pm01_utils::get_init_quat(motion_first_quaternion,robot_init_torso_quaternion);
+
         return true;
     } catch (const std::exception& e) {
         RCLCPP_ERROR(get_logger(), "Failed to initialize: %s", e.what());
@@ -150,70 +167,72 @@ bool pm01_controller::Initialize() {
 
 void pm01_controller::RLControl() {   
     if (message_handler_->GetLatestMotionState()->current_motion_task != "joint_bridge") return;
-    float control_dt_ = 1.0 / control_frequency;
 
     auto joint_state = message_handler_->GetLatestJointState();
     joint_pos = Eigen::Map<const Eigen::VectorXd>(joint_state->position.data(), joint_state->position.size()).cast<float>();
     joint_vel = Eigen::Map<const Eigen::VectorXd>(joint_state->velocity.data(), joint_state->velocity.size()).cast<float>();
 
     auto imu = message_handler_->GetLatestImu();
-    Eigen::Quaternionf base_quat(
+    Eigen::Quaternionf base_link_quat(
         (float)imu->quaternion.w, 
         (float)imu->quaternion.x, 
         (float)imu->quaternion.y, 
         (float)imu->quaternion.z);
     
     // Vector for observation loop [w, x, y, z]
-    Eigen::Vector4f base_quat_w(base_quat.w(), base_quat.x(), base_quat.y(), base_quat.z());
+    Eigen::Vector4f base_quat_w(base_link_quat.w(), base_link_quat.x(), base_link_quat.y(), base_link_quat.z());
+    Eigen::Vector3f base_ang_vel = Eigen::Vector3f(imu->angular_velocity.x, imu->angular_velocity.y, imu->angular_velocity.z).cast<float>(); 
 
-    Eigen::Vector3f base_ang_vel = Eigen::Vector3f(imu->angular_velocity.x, imu->angular_velocity.y, imu->angular_velocity.z).cast<float>();
+    if (!motion || motion->num_frames <= 0) {
+        return;
+    }
+    const int nf = motion->num_frames;
+    const int motion_idx = motion_index % nf;
 
-    auto cmd_vel_ = message_handler_->GetLatestCmdVel();
-    auto velocity_commands_ = message_handler_->GetLatestBodyVelCmd();
-    Eigen::Vector3f velocity_commands;
-    velocity_commands = Eigen::Vector3f(cmd_vel_->linear.x, cmd_vel_->linear.y, cmd_vel_->angular.z).cast<float>();
+    Eigen::VectorXf motion_commnad(48);
+    motion_commnad.segment(0, 24) = motion->dof_positions[motion_idx];
+    motion_commnad.segment(24, 24) = motion->dof_velocities[motion_idx];
 
-    // Pass quaternion to projected_gravity_b
-    Eigen::Vector3f projected_gravity = projected_gravity_b(base_quat, gravity_world);
-  
-    float phase = std::fmod(time / cycle_time, 1);
-    time += control_dt_;
-    Eigen::Vector2f gait_phase(std::sin(2 * M_PI * phase), std::cos(2 * M_PI * phase));
+    Eigen::VectorXf motion_anchor_ori_b = pm01_utils::get_motion_anchor_ori_b(
+        base_link_quat, init_quat, torso_yaw_degree, motion->root_quaternions[motion_idx]);
 
-    // +-----------+---------------------------------+-----------+
-    // |   Index   | Name                            |   Shape   |
-    // +-----------+---------------------------------+-----------+
-    // |     0     | joint_pos                       |   (24,)   |
-    // |     1     | joint_vel                       |   (24,)   |
-    // |     2     | actions                         |   (24,)   |
-    // |     3     | base_ang_vel                    |    (3,)   |
-    // |     4     | base_quat_w                     |    (4,)   |
-    // |     5     | velocity_commands               |    (3,)   |
-    // |     6     | projected_gravity               |    (3,)   |
-    // |     7     | gait_phase                      |    (2,)   |
-    // +-----------+---------------------------------+-----------+
+    timestep = timestep + 1;
+
+    // Align motion frame advance with timeline: each control tick is 1/control_frequency [s],
+    // one motion row spans 1/motion_data_fps [s] => advance motion_frame_accumulator_ by fps/control_frequency.
+    motion_frame_accumulator_ += fps / control_frequency;
+    while (motion_frame_accumulator_ >= 1.0f) {
+        motion_frame_accumulator_ -= 1.0f;
+        motion_index = (motion_index + 1) % nf;
+    }
+    
+    // [INFO] Observation Manager: <ObservationManager> contains 2 groups.
+    // +-----------------------------------------------------------+
+    // | Active Observation Terms in Group: 'policy' (shape: (129,)) |
+    // +-----------+-----------------------------------+-----------+
+    // |   Index   | Name                              |   Shape   |
+    // +-----------+-----------------------------------+-----------+
+    // |     0     | motion_command                    |   (48,)   |
+    // |     1     | motion_anchor_ori_b               |    (6,)   |
+    // |     2     | base_ang_vel                      |    (3,)   |
+    // |     3     | joint_pos_rel                     |   (24,)   |
+    // |     4     | joint_vel_rel                     |   (24,)   |
+    // |     5     | last_action                       |   (24,)   |
+    // +-----------+-----------------------------------+-----------+
+
+    obs.segment(0, 48) = motion_commnad;
+    obs.segment(48, 6) = motion_anchor_ori_b;
+    obs.segment(54, 3) = base_ang_vel * observation_scale_base_ang_vel;
+    
     for (int i = 0; i < 24; i++)
     {
-        // joint_pos
-        obs(i) = (joint_pos[xml_to_policy[i]] - default_joint_pos[xml_to_policy[i]]) * observation_scale_joint_pos;
-        // joint_vel
-        obs(i+24) = joint_vel[xml_to_policy[i]] * observation_scale_joint_vel;
+        // joint_pos_rel
+        obs(57 + i) = (joint_pos[xml_to_policy[i]] - default_joint_pos[xml_to_policy[i]]) * observation_scale_joint_pos;
+        // joint_vel_rel
+        obs(81 + i) = joint_vel[xml_to_policy[i]] * observation_scale_joint_vel;
     }
-    // actions
-    obs.segment(48, 24) = act;
-    for (int i = 0; i < 3; i++)
-    {
-        // base_ang_vel
-        obs(72 + i) = base_ang_vel[i] * observation_scale_base_ang_vel;
-    }
-    for (int i = 0; i < 4; i++)
-    {
-        // base_quat_w
-        obs(75 + i) = base_quat_w[i] * observation_scale_base_quat_w;
-    }
-    obs.segment(79, 3) = velocity_commands;
-    obs.segment(82, 3) = projected_gravity;
-    obs.segment(85, 2) = gait_phase;
+    // last_action
+    obs.segment(105, 24) = act;
 
     // policy forward
     std::vector<int64_t> input_node_dims = {1, obs.size()};
@@ -234,24 +253,10 @@ void pm01_controller::RLControl() {
     float* floatarr = output_tensors.front().GetTensorMutableData<float>();
     // Assume output is (1, num_actions)
     std::memcpy(act.data(), floatarr, static_cast<size_t>(num_actions) * sizeof(float));
-    
-    // for(int i=0; i<act.size(); ++i) {
-    //     if(act(i) > action_clip_limit) act(i) = action_clip_limit;
-    //     if(act(i) < -action_clip_limit) act(i) = -action_clip_limit;
-    // }
 
     joint_command_->position.resize(24);
     for (int i = 0; i < 24; i++){
         joint_command_->position[i] = act(policy_to_xml[i]) * action_scale + default_joint_pos[i];
-    }
-    
-    // Smooth transition from initial pose
-    const float transition_time = 2.0f;
-    if (time < transition_time) {
-        float ratio = time / transition_time;
-        for (int i = 0; i < 24; i++) {
-             joint_command_->position[i] = ratio * joint_command_->position[i] + (1.0f - ratio) * initial_joint_pos[i];
-        }
     }
 
     // 发送关节命令
@@ -363,6 +368,19 @@ void pm01_controller::MoveToDefaultPos() {
          if(joint_state) {
            initial_joint_pos = Eigen::Map<const Eigen::VectorXd>(joint_state->position.data(), joint_state->position.size()).cast<float>();
          }
+
+         // Initialize init_quat for motion tracking
+         auto imu = message_handler_->GetLatestImu();
+         if (imu && motion && motion->num_frames > 0) {
+            Eigen::Quaternionf base_quat(
+                (float)imu->quaternion.w, 
+                (float)imu->quaternion.x, 
+                (float)imu->quaternion.y, 
+                (float)imu->quaternion.z);
+            auto real_torso_quat_w = pm01_utils::get_torso_quat_w(base_quat, torso_yaw_degree);
+            auto motion_root_quat_w = motion->root_quaternions[0];
+            init_quat = pm01_utils::get_init_quat(motion_root_quat_w, real_torso_quat_w);
+         }
     }
 }
 
@@ -376,21 +394,6 @@ void pm01_controller::DampState() {
     
     joint_command_->parallel_parser_type = interface_protocol::msg::ParallelParserType::RL_PARSER;
     message_handler_->PublishJointCommand(*joint_command_);
-}
-
-Eigen::Vector3f pm01_controller::projected_gravity_b(Eigen::Quaternionf quat, Eigen::Vector3f vec) {
-    float w = quat.w();
-    float x = quat.x();
-    float y = quat.y();
-    float z = quat.z();
-    
-    // reshape to (N, 3) for multiplication -> vec is already (3)
-    // extract components from quaternions
-    Eigen::Vector3f xyz(x, y, z);
-    // t = xyz.cross(vec, dim=-1) * 2
-    Eigen::Vector3f t = xyz.cross(vec) * 2;
-    // (vec - quat[:, 0:1] * t + xyz.cross(t, dim=-1))
-    return vec - w * t + xyz.cross(t);
 }
 
 int main(int argc, char **argv)
