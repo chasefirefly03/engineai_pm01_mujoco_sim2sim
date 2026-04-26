@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>minic_mujoco</name>
+  <version>0.0.1</version>
+  <description>PM01 minic 策略 ONNX 推理节点（ROS2）：订阅 IMU/joint_state，发布 JointCommand（无 MuJoCo）</description>
+  <maintainer email="user@example.com">user</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>interface_protocol</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

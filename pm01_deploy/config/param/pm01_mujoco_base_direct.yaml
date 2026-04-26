@@ -1,0 +1,52 @@
+# policy_file: "/home/ubuntu/workspace/isaac/mycode/pm01_dirct/logs/rsl_rl/pm01_flat/2026-03-31_13-28-36/exported/policy.pt"
+robot_xml_path: "/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/resource/pm_v2.xml"
+
+get_info: false
+
+simulation_duration: 600
+simulation_dt: 0.001
+control_decimation: 20
+# 控制周期 (Control Period)=simulation_dt×control_decimation
+
+cycle_time: 0.6
+cmd_init: [0.6, 0, 0.0]
+
+num_observations: 87
+num_actions: 24
+
+# Scales
+observation_scale_linear_vel: 1.0
+observation_scale_base_ang_vel: 1.0
+observation_scale_base_quat_w: 1.0
+observation_scale_joint_pos: 1.0
+observation_scale_joint_vel: 1.0
+
+action_scale: 0.5
+
+# "J00_HIP_PITCH_L", "J01_HIP_ROLL_L", "J02_HIP_YAW_L", "J03_KNEE_PITCH_L", "J04_ANKLE_PITCH_L", "J05_ANKLE_ROLL_L",
+# "J06_HIP_PITCH_R", "J07_HIP_ROLL_R", "J08_HIP_YAW_R", "J09_KNEE_PITCH_R", "J10_ANKLE_PITCH_R", "J11_ANKLE_ROLL_R",
+# "J12_WAIST_YAW",
+# "J13_SHOULDER_PITCH_L", "J14_SHOULDER_ROLL_L", "J15_SHOULDER_YAW_L","J16_ELBOW_PITCH_L", "J17_ELBOW_YAW_L",
+# "J18_SHOULDER_PITCH_R", "J19_SHOULDER_ROLL_R", "J20_SHOULDER_YAW_R","J21_ELBOW_PITCH_R", "J22_ELBOW_YAW_R",
+# "J23_HEAD_YAW"
+
+default_joint_pos: [-0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
+                    -0.24, 0.0, 0.0, 0.48, -0.24, 0.0,
+                    0.0,
+                    0.2,  0.13,  0.0, -0.65, 0.0,
+                    0.2, -0.13,  0.0, -0.65, 0.0,
+                    0.0]
+
+joint_kp: [200, 150, 150, 200, 50, 50,
+           200, 150, 150, 200, 50, 50,
+           200,
+           40, 40, 40, 40, 40,
+           40, 40, 40, 40, 40,
+           40]
+
+joint_kd: [7.0, 3.0, 3.0, 7.0, 7.0, 7.0,
+           7.0, 3.0, 3.0, 7.0, 7.0, 7.0,
+           3.0,
+           3.0, 3.0, 3.0, 3.0, 3.0,
+           3.0, 3.0, 3.0, 3.0, 3.0,
+           3.0]

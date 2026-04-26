@@ -1,0 +1,46 @@
+policy_file: "src/pm01_deploy/config/policy/minic/walk.pt"
+motion_file_path: "src/pm01_deploy/config/minic_motion_data/walk.npz"
+
+robot_xml_path: "/home/ubuntu/workspace/pm01/deploy/pm01_deploy/src/pm01_deploy/resource/pm_v2.xml"
+
+get_info: false
+
+simulation_duration: 600
+simulation_dt: 0.001
+control_decimation: 20
+# 控制周期 (Control Period)=simulation_dt×control_decimation
+
+observation_scale_base_ang_vel: 1.0
+observation_scale_joint_pos: 1.0
+observation_scale_joint_vel: 1.0
+action_scale: 1.0
+
+# joint control parameters
+default_joint_pos: [-0.06, 0.0, 0.0, 0.12, -0.06, 0.0,
+                    -0.06, 0.0, 0.0, 0.12, -0.06, 0.0,
+                    0.0,
+                    0.0,  0.15,  0.0, -0.25, 0.0,
+                    0.0, -0.15,  0.0, -0.25, 0.0,
+                    0.0]
+
+  # "J00_HIP_PITCH_L", "J01_HIP_ROLL_L", "J02_HIP_YAW_L", "J03_KNEE_PITCH_L", "J04_ANKLE_PITCH_L", "J05_ANKLE_ROLL_L",
+  # "J06_HIP_PITCH_R", "J07_HIP_ROLL_R", "J08_HIP_YAW_R", "J09_KNEE_PITCH_R", "J10_ANKLE_PITCH_R", "J11_ANKLE_ROLL_R",
+  # "J12_WAIST_YAW",
+  # "J13_SHOULDER_PITCH_L", "J14_SHOULDER_ROLL_L", "J15_SHOULDER_YAW_L","J16_ELBOW_PITCH_L", "J17_ELBOW_YAW_L",
+  # "J18_SHOULDER_PITCH_R", "J19_SHOULDER_ROLL_R", "J20_SHOULDER_YAW_R","J21_ELBOW_PITCH_R", "J22_ELBOW_YAW_R",
+  # "J23_HEAD_YAW"
+
+joint_kp: [178.5, 178.5, 26.4, 178.5, 26.4, 26.4,
+           178.5, 178.5, 26.4, 178.5, 26.4, 26.4,
+           26.4,
+           26.4, 26.4, 26.4, 26.4, 26.4,
+           26.4, 26.4, 26.4, 26.4, 26.4,
+           26.4]
+
+
+joint_kd: [11.4, 11.4, 1.69, 11.4, 1.69, 1.69,
+           11.4, 11.4, 1.69, 11.4, 1.69, 1.69,
+           1.69,
+           1.69, 1.69, 1.69, 1.69, 1.69,
+           1.69, 1.69, 1.69, 1.69, 1.69,
+           1.69]
