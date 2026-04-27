@@ -68,7 +68,7 @@ python3 src/pm01_deploy/script/deploy_mujoco_minic.py --config_file src/pm01_dep
 ros2 run minic_mujoco pm01_mujoco_sim
 ```
 ## 部署
-！！！！执行完动作后不会停止，会重新加载动作数据并继续执行！！！！
+！！！！执行完动作后会退出程序，假如最后时刻的动作使得机器人不平衡，可能摔倒导致机器人受损！！！！
 1. 部署依赖onnxruntime，可以不在机器人上安装pytorch
 2. 动作和策略可在`src/pm01_deploy/config/param/pm01_real_minic.yaml`中修改
 3. cpp文件在`src/pm01_deploy/src/pm01_minic_deploy.cpp`

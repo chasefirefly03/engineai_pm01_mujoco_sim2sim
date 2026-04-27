@@ -403,6 +403,13 @@ void Pm01ControllerMujoco::ControlTimerCallback() {
   }
 
   ++policy_timestep_;
+  if (motion_->num_frames > 0 && policy_timestep_ >= motion_->num_frames) {
+    if (control_timer_) {
+      control_timer_->cancel();
+    }
+    RCLCPP_INFO(get_logger(), "动作数据已播放完毕（共 %d 帧），退出。", motion_->num_frames);
+    rclcpp::shutdown();
+  }
 }
 
 int main(int argc, char** argv) {

@@ -463,7 +463,19 @@ void Pm01ControllerMujoco::MainPhysicsLoop(mjModel* m, mjData* d, int anchor_bod
     }
 
     if (counter % control_decimation_ == 0) {
-      const int t = policy_timestep % motion_->num_frames;
+      if (motion_->num_frames <= 0) {
+        if (with_gui && sim_for_sync != nullptr) {
+          sim_for_sync->exitrequest.store(1);
+        }
+        break;
+      }
+      if (policy_timestep >= motion_->num_frames) {
+        if (with_gui && sim_for_sync != nullptr) {
+          sim_for_sync->exitrequest.store(1);
+        }
+        break;
+      }
+      const int t = policy_timestep;
 
       Eigen::VectorXf motion_command(48);
       motion_command.segment(0, 24) = motion_->dof_positions[t];
